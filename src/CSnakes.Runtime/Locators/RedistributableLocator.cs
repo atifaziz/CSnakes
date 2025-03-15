@@ -5,60 +5,32 @@ using ZstdSharp;
 
 namespace CSnakes.Runtime.Locators;
 
-internal class StaticVersionAttribute(string version, bool supportsFreeThreading) : Attribute
+public sealed record RedistributablePythonVersion
 {
-    public string Version => version;
-    public bool SupportsFreeThreading => supportsFreeThreading;
-}
+    public static readonly RedistributablePythonVersion Python3_9  = new(new Version(3, 9, 21));
+    public static readonly RedistributablePythonVersion Python3_10 = new(new Version(3, 10, 16));
+    public static readonly RedistributablePythonVersion Python3_11 = new(new Version(3, 11, 11));
+    public static readonly RedistributablePythonVersion Python3_12 = new(new Version(3, 12, 9));
+    public static readonly RedistributablePythonVersion Python3_13 = new(new Version(3, 13, 2)) { SupportsFreeThreading = true };
+    public static readonly RedistributablePythonVersion Python3_14 = new(new Version(3, 14, 0), "a5") { SupportsFreeThreading = true };
 
-public enum RedistributablePythonVersion
-{
-    [StaticVersion("3.9.21", false)]
-    Python3_9,
+    private RedistributablePythonVersion(Version version, string? preRelease = null) =>
+        (Version, PreRelease) = (version, preRelease);
 
-    [StaticVersion("3.10.16", false)]
-    Python3_10,
+    internal Version Version { get; init; }
+    internal string? PreRelease { get; init; }
+    internal bool SupportsFreeThreading { get; init; }
 
-    [StaticVersion("3.11.11", false)]
-    Python3_11,
-
-    [StaticVersion("3.12.9", false)]
-    Python3_12,
-
-    [StaticVersion("3.13.2", true)]
-    Python3_13,
-
-    [StaticVersion("3.14.0a5", true)]
-    Python3_14,
+    internal string DottedString => $"{Version}{PreRelease}"; // e.g. 3.14.0a5
 }
 
 internal class RedistributableLocator(ILogger<RedistributableLocator> logger, RedistributablePythonVersion version, int installerTimeout = 360, bool debug = false, bool freeThreaded = false) : PythonLocator
 {
     private const string standaloneRelease = "20250212";
     private const string MutexName = @"Global\CSnakesPythonInstall-1"; // run-time name includes Python version
-    protected override Version Version
-    {
-        get
-        {
-            // Get the version from the attribute
-            var versionAttribute = (StaticVersionAttribute)Attribute.GetCustomAttribute(
-                typeof(RedistributablePythonVersion).GetField(version.ToString())!,
-                typeof(StaticVersionAttribute))!;
-            return new Version(versionAttribute.Version);
-        }
-    }
 
-    protected bool SupportsFreeThreading
-    {
-        get
-        {
-            // Get the supportsFreeThreading from the attribute
-            var versionAttribute = (StaticVersionAttribute)Attribute.GetCustomAttribute(
-                typeof(RedistributablePythonVersion).GetField(version.ToString())!,
-                typeof(StaticVersionAttribute))!;
-            return versionAttribute.SupportsFreeThreading;
-        }
-    }
+    protected override Version Version => version.Version;
+    protected bool SupportsFreeThreading => version.SupportsFreeThreading;
 
     protected override string GetPythonExecutablePath(string folder, bool freeThreaded = false)
     {
@@ -73,7 +45,7 @@ internal class RedistributableLocator(ILogger<RedistributableLocator> logger, Re
 
     public override PythonLocationMetadata LocatePython()
     {
-        string dottedVersion = $"{Version.Major}.{Version.Minor}.{Version.Build}";
+        string dottedVersion = Version.ToString();
         if (debug)
         {
             dottedVersion += "d";
@@ -185,7 +157,7 @@ internal class RedistributableLocator(ILogger<RedistributableLocator> logger, Re
                 throw new PlatformNotSupportedException($"Unsupported platform: '{RuntimeInformation.OSDescription}'.");
             }
 
-            string downloadUrl = $"https://github.com/astral-sh/python-build-standalone/releases/download/{standaloneRelease}/cpython-{Version.Major}.{Version.Minor}.{Version.Build}+{standaloneRelease}-{platform}.tar.zst";
+            string downloadUrl = $"https://github.com/astral-sh/python-build-standalone/releases/download/{standaloneRelease}/cpython-{Version}+{standaloneRelease}-{platform}.tar.zst";
 
             // Download and extract the Zstd tarball
             logger.LogDebug("Downloading Python from {DownloadUrl}", downloadUrl);

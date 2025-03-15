@@ -1,4 +1,4 @@
-﻿using CSnakes.Runtime.EnvironmentManagement;
+using CSnakes.Runtime.EnvironmentManagement;
 using CSnakes.Runtime.Locators;
 using CSnakes.Runtime.PackageManagement;
 using Microsoft.Extensions.DependencyInjection;
@@ -189,13 +189,13 @@ public static partial class ServiceCollectionExtensions
     /// <param name="freeThreaded">Free Threaded Python (3.13+ only)</param>
     /// <param name="timeout">Timeout in seconds for the download and installation process.</param>
     /// <returns></returns>
-    public static IPythonEnvironmentBuilder FromRedistributable(this IPythonEnvironmentBuilder builder, RedistributablePythonVersion version = RedistributablePythonVersion.Python3_12, bool debug = false, bool freeThreaded = false, int timeout = 360)
+    public static IPythonEnvironmentBuilder FromRedistributable(this IPythonEnvironmentBuilder builder, RedistributablePythonVersion? version = null, bool debug = false, bool freeThreaded = false, int timeout = 360)
     {
         builder.Services.AddSingleton<PythonLocator>(
             sp =>
             {
                 var logger = sp.GetRequiredService<ILogger<RedistributableLocator>>();
-                return new RedistributableLocator(logger, version, timeout, debug, freeThreaded);
+                return new RedistributableLocator(logger, version ?? RedistributablePythonVersion.Python3_12, timeout, debug, freeThreaded);
             }
         );
         return builder;

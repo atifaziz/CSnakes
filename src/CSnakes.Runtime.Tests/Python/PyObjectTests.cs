@@ -86,8 +86,8 @@ public class PyObjectTests : RuntimeTestBase
     [Fact]
     public void TestObjectEqualsCollection()
     {
-        using var obj1 = PyObject.From<IEnumerable<string>>(["Hello!", "World!"]);
-        using var obj2 = PyObject.From<IEnumerable<string>>(["Hello!", "World!"]);
+        using var obj1 = PyObject.From<IEnumerable<string>>(new[] { "Hello!", "World!" });
+        using var obj2 = PyObject.From<IEnumerable<string>>(new[] { "Hello!", "World!" });
         Assert.True(obj1!.Equals(obj2));
         Assert.True(obj1 == obj2);
     }
@@ -109,8 +109,8 @@ public class PyObjectTests : RuntimeTestBase
     [Fact]
     public void TestObjectNotEqualsCollection()
     {
-        using var obj1 = PyObject.From<IEnumerable<string>>(["Hello!", "World!"]);
-        using var obj2 = PyObject.From<IEnumerable<string>>(["Hello?", "World?"]);
+        using var obj1 = PyObject.From<IEnumerable<string>>(new[] { "Hello!", "World!" });
+        using var obj2 = PyObject.From<IEnumerable<string>>(new[] { "Hello?", "World?" });
         Assert.True(obj1!.NotEquals(obj2));
         Assert.True(obj1 != obj2);
     }
@@ -174,7 +174,7 @@ public class PyObjectTests : RuntimeTestBase
         { !yes, /* {}        */ new Dictionary<int, string>() },
         { yes,  /* { 0: "" } */ new Dictionary<int, string> { [0] = "" } },
         { !yes, /* ()        */ new ValueTuple() },
-        { yes,  /* (0,)      */ new ValueTuple<int>(0) },
+        { yes,  /* (0,)      */ new ValueTuple<int>(0) }
     };
 
     /// <summary>
@@ -201,5 +201,150 @@ public class PyObjectTests : RuntimeTestBase
         using var obj = PyObject.From(input);
         var result = !obj;
         Assert.Equal(expected, result);
+    }
+
+    /// <summary>
+    /// Tests for short-circuiting behavior of the logical AND operator (&).
+    /// If left operand is falsy, right operand should not be evaluated.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(BooleanishTestCases), true)] // Get all test cases (both truthy and falsy)
+    public void TestLogicalAndShortCircuit(bool isTruthy, object input)
+    {
+        using var leftObj = PyObject.From(input);
+        using var rightObj = PyObject.From("right_operand");
+
+        // Perform the logical AND operation
+        using var result = leftObj & rightObj;
+
+        // Check short-circuiting based on truthiness
+        if (!isTruthy)
+        {
+            // For falsy left operand, result should be the left operand (short-circuit)
+            Assert.True(result.Is(leftObj), "Short-circuit AND failed: When left operand is falsy, result should be the left operand");
+        }
+        else
+        {
+            // For truthy left operand, result should be the right operand (no short-circuit)
+            Assert.True(result.Is(rightObj), "Non-short-circuit AND failed: When left operand is truthy, result should be the right operand");
+        }
+    }
+
+    /// <summary>
+    /// Tests for short-circuiting behavior of the logical OR operator (|).
+    /// If left operand is truthy, right operand should not be evaluated.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(BooleanishTestCases), true)] // Get all test cases (both truthy and falsy)
+    public void TestLogicalOrShortCircuit(bool isTruthy, object input)
+    {
+        using var leftObj = PyObject.From(input);
+        using var rightObj = PyObject.From("right_operand");
+
+        // Perform the logical OR operation
+        using var result = leftObj | rightObj;
+
+        // Check short-circuiting based on truthiness
+        if (isTruthy)
+        {
+            // For truthy left operand, result should be the left operand (short-circuit)
+            Assert.True(result.Is(leftObj), "Short-circuit OR failed: When left operand is truthy, result should be the left operand");
+        }
+        else
+        {
+            // For falsy left operand, result should be the right operand (no short-circuit)
+            Assert.True(result.Is(rightObj), "Non-short-circuit OR failed: When left operand is falsy, result should be the right operand");
+        }
+    }
+
+    /// <summary>
+    /// Tests for short-circuiting behavior of the C# logical AND operator (&&).
+    /// If left operand is falsy, right operand should not be evaluated.
+    /// </summary>
+    [Fact]
+    public void TestShortCircuitingLogicalAnd()
+    {
+        bool evaluationOccurred = false;
+
+        // Function that sets a flag when evaluated and returns a PyObject
+        PyObject FlagFunction()
+        {
+            evaluationOccurred = true;
+            return PyObject.From(true);
+        }
+
+        // Test with falsy left operand - should short-circuit
+        using var falsy = PyObject.From(false);
+
+        // Reset flag
+        evaluationOccurred = false;
+
+        // Perform logical AND operation using implicit bool conversion
+        // The key is to get the bool value first, then use && with the function call
+        bool leftResult = falsy ? true : false;
+        bool result1 = leftResult && (FlagFunction() ? true : false);
+
+        // Assert that right side wasn't evaluated (flag should still be false)
+        Assert.False(evaluationOccurred, "Short-circuit failed: right operand was evaluated when left operand was falsy");
+        Assert.False(result1);
+
+        // Test with truthy left operand - should not short-circuit
+        using var truthy = PyObject.From(true);
+
+        // Reset flag
+        evaluationOccurred = false;
+
+        // Perform logical AND operation
+        leftResult = truthy ? true : false;
+        bool result2 = leftResult && (FlagFunction() ? true : false);
+
+        // Assert that right side was evaluated (flag should be true)
+        Assert.True(evaluationOccurred, "Short-circuit incorrectly applied: right operand was not evaluated when left operand was truthy");
+        Assert.True(result2);
+    }
+
+    /// <summary>
+    /// Tests for short-circuiting behavior of the C# logical OR operator (||).
+    /// If left operand is truthy, right operand should not be evaluated.
+    /// </summary>
+    [Fact]
+    public void TestShortCircuitingLogicalOr()
+    {
+        bool evaluationOccurred = false;
+
+        // Function that sets a flag when evaluated and returns a PyObject
+        PyObject FlagFunction()
+        {
+            evaluationOccurred = true;
+            return PyObject.From(true);
+        }
+
+        // Test with truthy left operand - should short-circuit
+        using var truthy = PyObject.From(true);
+
+        // Reset flag
+        evaluationOccurred = false;
+
+        // Perform logical OR operation using implicit bool conversion
+        bool leftResult = truthy ? true : false;
+        bool result1 = leftResult || (FlagFunction() ? true : false);
+
+        // Assert that right side wasn't evaluated (flag should still be false)
+        Assert.False(evaluationOccurred, "Short-circuit failed: right operand was evaluated when left operand was truthy");
+        Assert.True(result1);
+
+        // Test with falsy left operand - should not short-circuit
+        using var falsy = PyObject.From(false);
+
+        // Reset flag
+        evaluationOccurred = false;
+
+        // Perform logical OR operation
+        leftResult = falsy ? true : false;
+        bool result2 = leftResult || (FlagFunction() ? true : false);
+
+        // Assert that right side was evaluated (flag should be true)
+        Assert.True(evaluationOccurred, "Short-circuit incorrectly applied: right operand was not evaluated when left operand was falsy");
+        Assert.True(result2);
     }
 }

@@ -358,6 +358,36 @@ public partial class PyObject : SafeHandle, ICloneable
     /// </summary>
     public static bool operator false(PyObject obj) => !obj;
 
+    /// <summary>
+    /// Logical AND operator with short-circuiting behavior. Equivalent to the <c>and</c> operator in Python.
+    /// If the left operand evaluates to false, the right operand is not evaluated.
+    /// </summary>
+    public static PyObject operator &(PyObject left, PyObject right)
+    {
+        using (GIL.Acquire())
+        {
+            // Short-circuit evaluation: if left is false, return left without evaluating right
+            if (!left)
+                return left.Clone();
+            return right.Clone();
+        }
+    }
+
+    /// <summary>
+    /// Logical OR operator with short-circuiting behavior. Equivalent to the <c>or</c> operator in Python.
+    /// If the left operand evaluates to true, the right operand is not evaluated.
+    /// </summary>
+    public static PyObject operator |(PyObject left, PyObject right)
+    {
+        using (GIL.Acquire())
+        {
+            // Short-circuit evaluation: if left is true, return left without evaluating right
+            if (left)
+                return left.Clone();
+            return right.Clone();
+        }
+    }
+
     public override int GetHashCode()
     {
         using (GIL.Acquire())

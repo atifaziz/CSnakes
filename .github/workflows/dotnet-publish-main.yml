@@ -5,9 +5,10 @@ name: .NET Publish (main)
 
 on:
   push:
-    branches: ["main"]
-    paths:
-      - "src/**"
+    branches: ["main", "nuget-trust-pub"] # TODO: remove temporary nuget-trust-pub trigger
+    # TODO: restore paths filter
+    # paths:
+    #   - "src/**"
 
 env:
   DOTNET_CONFIGURATION: Release
@@ -41,7 +42,8 @@ jobs:
         working-directory: src
 
       - name: Publish NuGet package CSnakes.Runtime
-        run: dotnet pack --no-build -c ${{ env.DOTNET_CONFIGURATION }} -o ../nuget -p:VersionSuffix='beta.${{ github.run_number }}'
+        # TODO: restore run number (temporarily pinned to an existing version to test push auth via 409)
+        run: dotnet pack --no-build -c ${{ env.DOTNET_CONFIGURATION }} -o ../nuget -p:VersionSuffix='beta.350'
         working-directory: src
 
       - name: Publish NuGet packages as artifacts
